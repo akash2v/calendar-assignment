@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import coverImg from './assets/cover.png'
+import './WallCalendar.css'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -446,7 +448,6 @@ export default function WallCalendar({
 
   return (
     <>
-      <style>{CSS}</style>
       <div className="wc-root" style={themeVars}>
         {/* Wire binding */}
         <SpiralBinding />
@@ -454,26 +455,38 @@ export default function WallCalendar({
         {/* Main card */}
         <div className="wc-card">
 
-          {/* Hero */}
+          {/* ── Hero ── */}
+          {/*
+            LAYER STACK (bottom → top):
+            z=2   .wc-cover-wrap    photo with smooth curved dip at bottom
+            z=10  .wc-shape-left    white triangle cut (bottom-left, above photo)
+            z=20  .wc-shape-right   blue angled shape (bottom-right, above photo)
+            z=30  .wc-hero-overlay  year + month text (inside blue shape)
+          */}
           <div className="wc-hero">
-            <svg
-              className="wc-hero-svg"
-              viewBox="0 0 900 220"
-              preserveAspectRatio="xMidYMid slice"
-              aria-hidden="true"
-            >
-              <HeroScene theme={t} />
-            </svg>
-            <div className="wc-hero-overlay">
-              <div className="wc-month-display">
+
+            {/* z=1 — Left blue triangle, sharp edges, no radius */}
+            <div className="wc-shape-left" />
+
+            {/* z=1 — Right blue parallelogram (rotated rectangle) */}
+            <div className="wc-shape-right">
+              {/* Year + month text sits inside this shape, below the photo */}
+              <div className="wc-hero-overlay">
                 <span className="wc-year">{year}</span>
                 <span className="wc-month">{MONTHS[month]}</span>
-              </div>
-              <div className="wc-nav-btns">
-                <button className="wc-nav-btn" onClick={prevMonth} aria-label="Previous month">←</button>
-                <button className="wc-nav-btn" onClick={nextMonth} aria-label="Next month">→</button>
+                <div className="wc-nav-btns">
+                  <button className="wc-nav-btn" onClick={prevMonth} aria-label="Previous month">←</button>
+                  <button className="wc-nav-btn" onClick={nextMonth} aria-label="Next month">→</button>
+                </div>
               </div>
             </div>
+
+            {/* z=2 — Cover div with bg-image, V-shape clip + shadow */}
+            <div
+              className="wc-cover-wrap"
+              style={{ backgroundImage: `url(${coverImg})` }}
+            />
+
           </div>
 
           {/* Lower panel */}
@@ -620,371 +633,3 @@ export default function WallCalendar({
     </>
   );
 }
-
-// ─── Scoped CSS ───────────────────────────────────────────────────────────────
-
-const CSS = `
-  .wc-root {
-    font-family: 'DM Sans', system-ui, sans-serif;
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 16px;
-  }
-
-  /* Spiral binding */
-  .wc-spiral-bar {
-    display: flex;
-    justify-content: center;
-    align-items: flex-end;
-    height: 28px;
-    gap: 8px;
-    padding: 0 32px;
-    position: relative;
-    z-index: 10;
-  }
-  .wc-nail-hook {
-    position: absolute;
-    left: 50%; top: -20px;
-    transform: translateX(-50%);
-    width: 12px; height: 26px;
-    border: 3px solid #999;
-    border-bottom: none;
-    border-radius: 6px 6px 0 0;
-  }
-  .wc-nail-hook::before {
-    content: '';
-    position: absolute;
-    left: 50%; top: -8px;
-    transform: translateX(-50%);
-    width: 6px; height: 8px;
-    background: #999;
-    border-radius: 3px;
-  }
-  .wc-coil {
-    width: 14px; height: 20px;
-    border: 2.5px solid #aaa;
-    border-bottom: none;
-    border-radius: 7px 7px 0 0;
-  }
-
-  /* Card */
-  .wc-card {
-    background: #fff;
-    border-radius: 0 0 12px 12px;
-    overflow: hidden;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.06);
-  }
-
-  /* Hero */
-  .wc-hero {
-    position: relative;
-    height: 220px;
-    overflow: hidden;
-    background: linear-gradient(135deg, var(--wc-hero-start) 0%, var(--wc-hero-end) 100%);
-  }
-  .wc-hero-svg {
-    position: absolute;
-    inset: 0;
-    width: 100%; height: 100%;
-  }
-  .wc-hero-overlay {
-    position: absolute;
-    bottom: 0; right: 0;
-    width: 55%; height: 100%;
-    clip-path: polygon(30% 0%, 100% 0%, 100% 100%, 0% 100%);
-    background: var(--wc-main);
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    justify-content: flex-end;
-    padding: 24px 28px;
-    z-index: 2;
-  }
-  .wc-month-display { text-align: right; }
-  .wc-year {
-    display: block;
-    font-family: 'Playfair Display', Georgia, serif;
-    font-size: 22px;
-    font-weight: 400;
-    color: rgba(255,255,255,0.85);
-    letter-spacing: 3px;
-  }
-  .wc-month {
-    display: block;
-    font-family: 'Playfair Display', Georgia, serif;
-    font-size: 42px;
-    font-weight: 700;
-    color: #fff;
-    line-height: 1;
-    letter-spacing: 2px;
-  }
-  .wc-nav-btns { display: flex; gap: 8px; margin-top: 14px; }
-  .wc-nav-btn {
-    background: rgba(255,255,255,0.18);
-    border: none;
-    border-radius: 50%;
-    width: 34px; height: 34px;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    color: #fff; font-size: 16px;
-    transition: background 0.2s;
-  }
-  .wc-nav-btn:hover { background: rgba(255,255,255,0.32); }
-
-  /* Lower split */
-  .wc-lower {
-    display: grid;
-    grid-template-columns: 200px 1fr;
-  }
-
-  /* Notes panel */
-  .wc-notes {
-    padding: 24px 20px;
-    border-right: 1px solid #eef0f4;
-    background: #fafbfd;
-    min-height: 340px;
-    display: flex;
-    flex-direction: column;
-  }
-  .wc-notes-label {
-    font-size: 11px;
-    font-weight: 500;
-    color: #7a7a8a;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-bottom: 8px;
-  }
-  .wc-notes-range {
-    font-size: 12px;
-    color: var(--wc-main);
-    font-weight: 500;
-    margin-bottom: 10px;
-    min-height: 18px;
-  }
-  .wc-notes-fields {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    flex: 1;
-    margin-bottom: 10px;
-  }
-  .wc-note-input {
-    border: none;
-    border-bottom: 1px solid #dde0ea;
-    background: transparent;
-    font-family: inherit;
-    font-size: 13px;
-    color: #1a1a2e;
-    padding: 3px 0;
-    width: 100%;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  .wc-note-input:focus { border-color: var(--wc-main); }
-  .wc-note-input::placeholder { color: #ccc; }
-  .wc-add-note {
-    font-size: 12px;
-    color: var(--wc-main);
-    background: none;
-    border: none;
-    cursor: pointer;
-    text-align: left;
-    padding: 0;
-    font-family: inherit;
-    opacity: 0.8;
-    transition: opacity 0.2s;
-  }
-  .wc-add-note:hover { opacity: 1; }
-
-  /* Holidays */
-  .wc-holidays {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px dashed #e0e3ed;
-  }
-  .wc-holidays-label {
-    font-size: 10px;
-    font-weight: 500;
-    color: #7a7a8a;
-    text-transform: uppercase;
-    letter-spacing: 1.2px;
-    margin-bottom: 8px;
-  }
-  .wc-holiday-item {
-    font-size: 11px;
-    color: #1a1a2e;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 5px;
-  }
-  .wc-holiday-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: #f0a500;
-    flex-shrink: 0;
-  }
-  .wc-no-holiday { font-size: 11px; color: #bbb; }
-
-  /* Grid panel */
-  .wc-grid-panel { padding: 20px 20px 16px; }
-  .wc-weekdays {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    margin-bottom: 6px;
-  }
-  .wc-weekday {
-    text-align: center;
-    font-size: 11px;
-    font-weight: 500;
-    color: #7a7a8a;
-    letter-spacing: 0.8px;
-    padding: 4px 0;
-  }
-  .wc-weekday--weekend { color: #e53935; }
-
-  /* Day grid */
-  .wc-days {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 2px;
-  }
-  .wc-day {
-    aspect-ratio: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    border: none;
-    background: transparent;
-    font-size: 13px;
-    font-weight: 400;
-    font-family: inherit;
-    color: #1a1a2e;
-    cursor: pointer;
-    transition: all 0.15s;
-    position: relative;
-    user-select: none;
-    padding: 0;
-  }
-  .wc-day:hover:not(:disabled) {
-    background: var(--wc-light);
-    color: var(--wc-dark);
-  }
-  .wc-day:disabled {
-    color: #ccc;
-    cursor: default;
-    font-size: 12px;
-  }
-  .wc-day--today {
-    font-weight: 700;
-    border: 2px solid var(--wc-main);
-    color: var(--wc-main);
-  }
-  .wc-day--weekend { color: #e53935; }
-  .wc-day--range {
-    background: var(--wc-range-bg);
-    border-radius: 0;
-    color: var(--wc-dark);
-  }
-  .wc-day--start {
-    background: var(--wc-main) !important;
-    color: #fff !important;
-    border-radius: 50% 0 0 50%;
-    font-weight: 600;
-    z-index: 2;
-  }
-  .wc-day--end {
-    background: var(--wc-main) !important;
-    color: #fff !important;
-    border-radius: 0 50% 50% 0;
-    font-weight: 600;
-    z-index: 2;
-  }
-  .wc-day--start.wc-day--end { border-radius: 50%; }
-  .wc-day--holiday::after {
-    content: '';
-    position: absolute;
-    bottom: 3px; left: 50%;
-    transform: translateX(-50%);
-    width: 4px; height: 4px;
-    border-radius: 50%;
-    background: #f0a500;
-  }
-  .wc-day--start.wc-day--holiday::after,
-  .wc-day--end.wc-day--holiday::after {
-    background: rgba(255,255,255,0.8);
-  }
-
-  /* Hints */
-  .wc-hint {
-    text-align: center;
-    font-size: 11px;
-    color: #7a7a8a;
-    padding: 10px 0 2px;
-    letter-spacing: 0.3px;
-  }
-  .wc-summary {
-    text-align: center;
-    font-size: 12px;
-    color: var(--wc-main);
-    font-weight: 500;
-    padding: 2px 0;
-  }
-  .wc-clear {
-    display: block;
-    margin: 4px auto 0;
-    font-size: 11px;
-    color: #aaa;
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-family: inherit;
-    padding: 4px 8px;
-    transition: color 0.2s;
-  }
-  .wc-clear:hover { color: #e53935; }
-
-  /* Theme bar */
-  .wc-theme-bar {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    padding: 10px 20px;
-    background: #fafbfd;
-    border-top: 1px solid #eef0f4;
-  }
-  .wc-theme-label {
-    font-size: 11px;
-    color: #7a7a8a;
-    margin-right: 4px;
-  }
-  .wc-theme-dot {
-    width: 18px; height: 18px;
-    border-radius: 50%;
-    cursor: pointer;
-    border: 2.5px solid transparent;
-    transition: border-color 0.2s;
-    padding: 0;
-  }
-  .wc-theme-dot--active { border-color: #333; }
-
-  /* Responsive */
-  @media (max-width: 620px) {
-    .wc-lower { grid-template-columns: 1fr; }
-    .wc-notes {
-      border-right: none;
-      border-bottom: 1px solid #eef0f4;
-      min-height: auto;
-    }
-    .wc-hero { height: 160px; }
-    .wc-hero-overlay { width: 60%; padding: 14px 16px; }
-    .wc-month { font-size: 28px; }
-    .wc-year { font-size: 16px; }
-    .wc-day { font-size: 11px; }
-    .wc-theme-bar { padding: 8px 12px; }
-    .wc-grid-panel { padding: 14px 12px 10px; }
-    .wc-notes { padding: 16px 14px; }
-  }
-`;
