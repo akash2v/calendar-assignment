@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faChevronDown, faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import coverImg from './assets/cover.webp'
 import './WallCalendar.css'
 
@@ -273,6 +275,7 @@ export default function WallCalendar({
   const [pickerOpen, setPickerOpen] = useState<"year" | "month" | null>(null);
   const [pickerPos, setPickerPos] = useState({ top: 0, right: 0 });
   const [flipDir, setFlipDir] = useState<"next" | "prev" | null>(null);
+  const [notesOpen, setNotesOpen] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -313,7 +316,11 @@ export default function WallCalendar({
 
   // ── Navigation ──────────────────────────────────────────────────────────────
 
+  const flipAudio = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => { flipAudio.current = new Audio("/flip.mp3"); }, []);
+
   const triggerFlip = useCallback((dir: "next" | "prev", cb: () => void) => {
+    if (flipAudio.current) { flipAudio.current.currentTime = 0; flipAudio.current.play().catch(() => {}); }
     setFlipDir(dir);
     setTimeout(() => {
       cb();
@@ -512,8 +519,8 @@ export default function WallCalendar({
                 <span className="wc-year" onClick={() => openPicker("year")}>{year}</span>
                 <span className="wc-month" onClick={() => openPicker("month")}>{MONTHS[month]}</span>
                 <div className="wc-nav-btns">
-                  <button className="wc-nav-btn" onClick={prevMonth} aria-label="Previous month">←</button>
-                  <button className="wc-nav-btn" onClick={nextMonth} aria-label="Next month">→</button>
+                  <button className="wc-nav-btn" onClick={prevMonth} aria-label="Previous month"><FontAwesomeIcon icon={faChevronLeft} /></button>
+                  <button className="wc-nav-btn" onClick={nextMonth} aria-label="Next month"><FontAwesomeIcon icon={faChevronRight} /></button>
                 </div>
               </div>
 
@@ -561,7 +568,17 @@ export default function WallCalendar({
             {/* Notes */}
             <aside className="wc-notes">
               <div className="wc-notes-header">
-                <p className="wc-notes-label">Notes</p>
+                <button
+                  className="wc-notes-collapse-btn"
+                  onClick={() => setNotesOpen((v) => !v)}
+                  type="button"
+                  aria-expanded={notesOpen}
+                >
+                  <p className="wc-notes-label">Notes</p>
+                  <span className={`wc-notes-chevron${notesOpen ? " wc-notes-chevron--open" : ""}`}>
+                    <FontAwesomeIcon icon={faChevronDown} />
+                  </span>
+                </button>
                 <button
                   className="wc-notes-toggle"
                   onClick={() => setShowAllNotes((v) => !v)}
@@ -571,49 +588,50 @@ export default function WallCalendar({
                 </button>
               </div>
 
-              {showAllNotes ? (
-                <NotesList
-                  items={monthNotesList}
-                  onDeleteGroup={deleteNoteGroup}
-                  onDeleteNote={deleteNoteItem}
-                />
-              ) : (
-                /* ── Edit view ── */
-                <>
-                  <p className="wc-notes-range">
-                    {notesRangeLabel || `${SHORT_MONTHS[month]} ${year}`}
-                  </p>
-                  <div className="wc-notes-fields">
-                    {currentNotes.map((val, i) => (
-                      <input
-                        key={i}
-                        className="wc-note-input"
-                        type="text"
-                        placeholder={`Note ${i + 1}…`}
-                        value={val}
-                        onChange={(e) => updateNote(i, e.target.value)}
-                      />
-                    ))}
-                  </div>
-                  <button className="wc-add-note" onClick={addNote} type="button">
-                    + add note
-                  </button>
-                </>
-              )}
-
-              {/* Holidays */}
-              <div className="wc-holidays">
-                <p className="wc-holidays-label">This month</p>
-                {Object.keys(holidays).length === 0 ? (
-                  <p className="wc-no-holiday">No holidays</p>
+              <div className={`wc-notes-body${notesOpen ? " wc-notes-body--open" : ""}`}>
+                {showAllNotes ? (
+                  <NotesList
+                    items={monthNotesList}
+                    onDeleteGroup={deleteNoteGroup}
+                    onDeleteNote={deleteNoteItem}
+                  />
                 ) : (
-                  Object.entries(holidays).map(([d, name]) => (
-                    <div key={d} className="wc-holiday-item">
-                      <span className="wc-holiday-dot" />
-                      <span><strong>{d}</strong> {name}</span>
+                  <>
+                    <p className="wc-notes-range">
+                      {notesRangeLabel || `${SHORT_MONTHS[month]} ${year}`}
+                    </p>
+                    <div className="wc-notes-fields">
+                      {currentNotes.map((val, i) => (
+                        <input
+                          key={i}
+                          className="wc-note-input"
+                          type="text"
+                          placeholder={`Note ${i + 1}…`}
+                          value={val}
+                          onChange={(e) => updateNote(i, e.target.value)}
+                        />
+                      ))}
                     </div>
-                  ))
+                    <button className="wc-add-note" onClick={addNote} type="button">
+                      + add note
+                    </button>
+                  </>
                 )}
+
+                {/* Holidays */}
+                <div className="wc-holidays">
+                  <p className="wc-holidays-label">This month</p>
+                  {Object.keys(holidays).length === 0 ? (
+                    <p className="wc-no-holiday">No holidays</p>
+                  ) : (
+                    Object.entries(holidays).map(([d, name]) => (
+                      <div key={d} className="wc-holiday-item">
+                        <span className="wc-holiday-dot" />
+                        <span><strong>{d}</strong> {name}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </aside>
 

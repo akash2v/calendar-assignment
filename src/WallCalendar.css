@@ -306,6 +306,38 @@
   margin-bottom: 8px;
 }
 
+/* Collapse button — only acts as a trigger on mobile, invisible on desktop */
+.wc-notes-collapse-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: default;
+  font-family: inherit;
+}
+
+.wc-notes-chevron {
+  display: none;
+  font-size: 12px;
+  color: var(--wc-main);
+  line-height: 1;
+  transform: rotate(0deg);
+  transition: transform 0.25s ease;
+}
+
+.wc-notes-chevron--open {
+  transform: rotate(180deg);
+}
+
+/* Body is always visible on desktop */
+.wc-notes-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
 .wc-notes-toggle {
   font-size: 10px;
   background: none;
@@ -812,7 +844,42 @@
     border-right: none;
     border-bottom: 1px solid #eef0f4;
     min-height: auto;
-    padding: 16px 14px;
+    padding: 0;
+  }
+
+  .wc-notes-header {
+    padding: 12px 14px;
+    margin-bottom: 0;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.25s;
+  }
+
+  .wc-notes-collapse-btn {
+    cursor: pointer;
+  }
+
+  .wc-notes-chevron {
+    display: inline-block;
+  }
+
+  /* Body hidden by default on mobile */
+  .wc-notes-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                padding 0.25s ease;
+    padding: 0 14px;
+  }
+
+  .wc-notes-body--open {
+    max-height: 600px;
+    padding: 12px 14px;
+  }
+
+  /* Show divider only when open */
+  .wc-notes-body--open ~ .wc-notes-header,
+  .wc-notes-header:has(+ .wc-notes-body--open) {
+    border-bottom-color: #eef0f4;
   }
 
   .wc-hero {
@@ -852,7 +919,7 @@
   }
 
   .wc-month {
-    font-size: clamp(18px, 6vw, 26px);
+    font-size: clamp(18px, 6vw, 18px);
   }
 
   .wc-day {
