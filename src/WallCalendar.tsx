@@ -272,6 +272,7 @@ export default function WallCalendar({
   const [showAllNotes, setShowAllNotes] = useState(false);
   const [pickerOpen, setPickerOpen] = useState<"year" | "month" | null>(null);
   const [pickerPos, setPickerPos] = useState({ top: 0, right: 0 });
+  const [flipDir, setFlipDir] = useState<"next" | "prev" | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -312,23 +313,35 @@ export default function WallCalendar({
 
   // ── Navigation ──────────────────────────────────────────────────────────────
 
+  const triggerFlip = useCallback((dir: "next" | "prev", cb: () => void) => {
+    setFlipDir(dir);
+    setTimeout(() => {
+      cb();
+      setFlipDir(null);
+    }, 380);
+  }, []);
+
   const prevMonth = useCallback(() => {
-    const d = new Date(year, month - 1, 1);
-    setYear(d.getFullYear());
-    setMonth(d.getMonth());
-    setRangeStart(null);
-    setRangeEnd(null);
-    setSelecting(false);
-  }, [year, month]);
+    triggerFlip("prev", () => {
+      const d = new Date(year, month - 1, 1);
+      setYear(d.getFullYear());
+      setMonth(d.getMonth());
+      setRangeStart(null);
+      setRangeEnd(null);
+      setSelecting(false);
+    });
+  }, [year, month, triggerFlip]);
 
   const nextMonth = useCallback(() => {
-    const d = new Date(year, month + 1, 1);
-    setYear(d.getFullYear());
-    setMonth(d.getMonth());
-    setRangeStart(null);
-    setRangeEnd(null);
-    setSelecting(false);
-  }, [year, month]);
+    triggerFlip("next", () => {
+      const d = new Date(year, month + 1, 1);
+      setYear(d.getFullYear());
+      setMonth(d.getMonth());
+      setRangeStart(null);
+      setRangeEnd(null);
+      setSelecting(false);
+    });
+  }, [year, month, triggerFlip]);
 
   // ── Day selection ───────────────────────────────────────────────────────────
 
@@ -477,7 +490,7 @@ export default function WallCalendar({
         <SpiralBinding />
 
         {/* Main card */}
-        <div className="wc-card">
+        <div className={`wc-card${flipDir ? ` wc-card--flip-${flipDir}` : ""}`}>
 
           {/* ── Hero ── */}
           {/*
@@ -516,7 +529,7 @@ export default function WallCalendar({
                         <button
                           key={y}
                           className={`wc-picker-item${y === year ? " wc-picker-item--active" : ""}`}
-                          onClick={() => { setYear(y); setRangeStart(null); setRangeEnd(null); setSelecting(false); setPickerOpen(null); }}
+                          onClick={() => { triggerFlip(y > year ? "next" : "prev", () => { setYear(y); setRangeStart(null); setRangeEnd(null); setSelecting(false); }); setPickerOpen(null); }}
                           type="button"
                         >{y}</button>
                       ))
@@ -524,7 +537,7 @@ export default function WallCalendar({
                         <button
                           key={i}
                           className={`wc-picker-item${i === month ? " wc-picker-item--active" : ""}`}
-                          onClick={() => { setMonth(i); setRangeStart(null); setRangeEnd(null); setSelecting(false); setPickerOpen(null); }}
+                          onClick={() => { triggerFlip(i > month ? "next" : "prev", () => { setMonth(i); setRangeStart(null); setRangeEnd(null); setSelecting(false); }); setPickerOpen(null); }}
                           type="button"
                         >{name}</button>
                       ))

@@ -61,6 +61,33 @@
   box-shadow:
     0 8px 40px rgba(0, 0, 0, 0.08),
     0 2px 8px rgba(0, 0, 0, 0.06);
+  transform-origin: top center;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* Next → page flips up and away (forward) */
+@keyframes wc-flip-next {
+  0%   { transform: perspective(1200px) rotateX(0deg);   opacity: 1; }
+  40%  { transform: perspective(1200px) rotateX(-70deg); opacity: 0.6; box-shadow: 0 40px 60px rgba(0,0,0,0.22); }
+  60%  { transform: perspective(1200px) rotateX(-70deg); opacity: 0.6; }
+  100% { transform: perspective(1200px) rotateX(0deg);   opacity: 1; }
+}
+
+/* Prev → page flips down and back */
+@keyframes wc-flip-prev {
+  0%   { transform: perspective(1200px) rotateX(0deg);  opacity: 1; }
+  40%  { transform: perspective(1200px) rotateX(70deg); opacity: 0.6; box-shadow: 0 -20px 60px rgba(0,0,0,0.18); }
+  60%  { transform: perspective(1200px) rotateX(70deg); opacity: 0.6; }
+  100% { transform: perspective(1200px) rotateX(0deg);  opacity: 1; }
+}
+
+.wc-card--flip-next {
+  animation: wc-flip-next 0.38s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.wc-card--flip-prev {
+  animation: wc-flip-prev 0.38s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 /* ─── Hero ─────────────────────────────────────────────────────────────────── */
