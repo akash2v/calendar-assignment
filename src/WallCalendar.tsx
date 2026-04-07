@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import coverImg from './assets/cover.png'
 import './WallCalendar.css'
 
@@ -108,8 +109,30 @@ function getHolidaysForMonth(year: number, month: number): Record<number, string
   return result;
 }
 
+const LS_KEY = "wc-notes";
+
 function notesKey(year: number, month: number): string {
   return `${year}-${month}`;
+}
+
+function dateKey(dt: DatePoint): string {
+  return `${dt.y}-${dt.m + 1}-${dt.d}`;
+}
+
+function rangeNoteKey(start: DatePoint, end: DatePoint | null): string {
+  if (!end) return dateKey(start);
+  const s = toComparable(start) <= toComparable(end) ? start : end;
+  const e = toComparable(start) <= toComparable(end) ? end   : start;
+  return `${dateKey(s)}__${dateKey(e)}`;
+}
+
+function loadNotes(): NotesStore {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "{}"); }
+  catch { return {}; }
+}
+
+function saveNotes(store: NotesStore) {
+  localStorage.setItem(LS_KEY, JSON.stringify(store));
 }
 
 // ─── SVG Hero Scenes ──────────────────────────────────────────────────────────
@@ -257,6 +280,64 @@ function HeroScene({ theme }: { theme: Theme }) {
   }
 }
 
+// ─── NotesList Component ─────────────────────────────────────────────────────
+
+interface NotesListItem {
+  key: string;
+  notes: string[];
+}
+
+interface NotesListProps {
+  items: NotesListItem[];
+  onDeleteGroup: (key: string) => void;
+  onDeleteNote: (key: string, noteIndex: number) => void;
+}
+
+function NotesList({ items, onDeleteGroup, onDeleteNote }: NotesListProps) {
+  if (items.length === 0)
+    return <p className="wc-nl-empty">No notes this month</p>;
+
+  return (
+    <div className="wc-nl-scroll">
+      {items.map(({ key: k, notes: noteItems }) => {
+        const isRange = k.includes("__");
+        const label = isRange
+          ? k.replace("__", " – ").replace(/-/g, "/")
+          : k.replace(/-/g, "/");
+        return (
+          <div key={k} className="wc-nl-group">
+            <div className={`wc-nl-group-header ${isRange ? "wc-nl-group-header--range" : "wc-nl-group-header--single"}`}>
+              <span className="wc-nl-dot" />
+              <span className="wc-nl-group-label">{label}</span>
+              <button
+                className="wc-nl-del-group"
+                onClick={() => onDeleteGroup(k)}
+                title="Delete all notes for this date"
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
+            {noteItems.map((note, i) => (
+              <div key={i} className="wc-nl-item">
+                <span className="wc-nl-item-text">{note}</span>
+                <button
+                  className="wc-nl-del-note"
+                  onClick={() => onDeleteNote(k, i)}
+                  title="Delete note"
+                  type="button"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function SpiralBinding() {
@@ -280,12 +361,13 @@ interface DayCellProps {
   isEnd?: boolean;
   inRange?: boolean;
   hasHoliday?: boolean;
+  noteType?: "single" | "range" | null;
   onClick?: () => void;
 }
 
 function DayCell({
   day, isOtherMonth, isToday, isWeekend,
-  isStart, isEnd, inRange, hasHoliday, onClick,
+  isStart, isEnd, inRange, hasHoliday, noteType, onClick,
 }: DayCellProps) {
   const classes = [
     "wc-day",
@@ -296,6 +378,8 @@ function DayCell({
     isEnd        ? "wc-day--end" : "",
     inRange && !isStart && !isEnd ? "wc-day--range" : "",
     hasHoliday   ? "wc-day--holiday" : "",
+    noteType === "single" ? "wc-day--note-single" : "",
+    noteType === "range"  ? "wc-day--note-range"  : "",
   ].filter(Boolean).join(" ");
 
   return (
@@ -331,14 +415,42 @@ export default function WallCalendar({
   const [rangeStart, setRangeStart] = useState<DatePoint | null>(null);
   const [rangeEnd,   setRangeEnd]   = useState<DatePoint | null>(null);
   const [selecting,  setSelecting]  = useState(false);
-  const [notes, setNotes]           = useState<NotesStore>({});
+  const [notes, setNotes] = useState<NotesStore>(loadNotes);
+  const [showAllNotes, setShowAllNotes] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState<"year" | "month" | null>(null);
+  const [pickerPos, setPickerPos] = useState({ top: 0, right: 0 });
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      const pop = document.getElementById("wc-picker-portal");
+      if (
+        overlayRef.current && !overlayRef.current.contains(e.target as Node) &&
+        pop && !pop.contains(e.target as Node)
+      ) setPickerOpen(null);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [pickerOpen]);
+
+  const openPicker = (type: "year" | "month") => {
+    if (overlayRef.current) {
+      const r = overlayRef.current.getBoundingClientRect();
+      setPickerPos({ top: r.bottom + window.scrollY + 6, right: window.innerWidth - r.right });
+    }
+    setPickerOpen((v) => v === type ? null : type);
+  };
 
   const t = THEMES[theme];
   const holidays = getHolidaysForMonth(year, month);
-  const key = notesKey(year, month);
 
-  // Ensure notes array exists for current month
-  const currentNotes = notes[key] ?? ["", "", ""];
+  // Active notes key: per selected date/range, fallback to month
+  const activeKey = rangeStart
+    ? rangeNoteKey(rangeStart, rangeEnd)
+    : notesKey(year, month);
+
+  const currentNotes = notes[activeKey] ?? ["", "", ""];
 
   // Notify parent on range change
   useEffect(() => {
@@ -389,17 +501,39 @@ export default function WallCalendar({
 
   const updateNote = (idx: number, val: string) => {
     setNotes((prev) => {
-      const arr = [...(prev[key] ?? ["", "", ""])];
+      const arr = [...(prev[activeKey] ?? ["", "", ""])];
       arr[idx] = val;
-      return { ...prev, [key]: arr };
+      const next = { ...prev, [activeKey]: arr };
+      saveNotes(next);
+      return next;
     });
   };
 
   const addNote = () => {
-    setNotes((prev) => ({
-      ...prev,
-      [key]: [...(prev[key] ?? ["", "", ""]), ""],
-    }));
+    setNotes((prev) => {
+      const next = { ...prev, [activeKey]: [...(prev[activeKey] ?? ["", "", ""]), ""] };
+      saveNotes(next);
+      return next;
+    });
+  };
+
+  const deleteNoteGroup = (key: string) => {
+    setNotes((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      saveNotes(next);
+      return next;
+    });
+  };
+
+  const deleteNoteItem = (key: string, idx: number) => {
+    setNotes((prev) => {
+      const arr = (prev[key] ?? []).filter((_, i) => i !== idx);
+      const next = arr.length ? { ...prev, [key]: arr } : { ...prev };
+      if (!arr.length) delete next[key];
+      saveNotes(next);
+      return next;
+    });
   };
 
   // ── Calendar grid ────────────────────────────────────────────────────────────
@@ -408,6 +542,43 @@ export default function WallCalendar({
   const startOffset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const prevMonthDays = new Date(year, month, 0).getDate();
+
+  // Days in current month that have non-empty notes, with type
+  const daysWithNoteType = new Map<number, "single" | "range">();
+  Object.entries(notes).forEach(([k, arr]) => {
+    if (!arr.some((v) => v.trim())) return;
+    const single = k.match(/^(\d+)-(\d+)-(\d+)$/);
+    if (single) {
+      const [, y, m, d] = single.map(Number);
+      if (y === year && m === month + 1) daysWithNoteType.set(d, "single");
+      return;
+    }
+    const range = k.match(/^(\d+)-(\d+)-(\d+)__(\d+)-(\d+)-(\d+)$/);
+    if (range) {
+      const [, sy, sm, sd, ey, em, ed] = range.map(Number);
+      const start = new Date(sy, sm - 1, sd);
+      const end   = new Date(ey, em - 1, ed);
+      for (let day = 1; day <= daysInMonth; day++) {
+        const cur = new Date(year, month, day);
+        if (cur >= start && cur <= end) daysWithNoteType.set(day, "range");
+      }
+    }
+  });
+
+  // All notes for this month (for list view)
+  const monthNotesList = Object.entries(notes)
+    .filter(([k, arr]) => {
+      if (!arr.some((v) => v.trim())) return false;
+      const single = k.match(/^(\d+)-(\d+)-(\d+)$/);
+      if (single) { const [, y, m] = single.map(Number); return y === year && m === month + 1; }
+      const range = k.match(/^(\d+)-(\d+)-(\d+)__(\d+)-(\d+)-(\d+)$/);
+      if (range) {
+        const [, sy, sm, , ey, em] = range.map(Number);
+        return (sy === year && sm === month + 1) || (ey === year && em === month + 1);
+      }
+      return false;
+    })
+    .map(([k, arr]) => ({ key: k, notes: arr.filter((v) => v.trim()) }));
 
   const rs = rangeStart ? toComparable(rangeStart) : null;
   const re = rangeEnd   ? toComparable(rangeEnd)   : null;
@@ -471,14 +642,43 @@ export default function WallCalendar({
             {/* z=1 — Right blue parallelogram (rotated rectangle) */}
             <div className="wc-shape-right">
               {/* Year + month text sits inside this shape, below the photo */}
-              <div className="wc-hero-overlay">
-                <span className="wc-year">{year}</span>
-                <span className="wc-month">{MONTHS[month]}</span>
+              <div className="wc-hero-overlay" ref={overlayRef}>
+                <span className="wc-year" onClick={() => openPicker("year")}>{year}</span>
+                <span className="wc-month" onClick={() => openPicker("month")}>{MONTHS[month]}</span>
                 <div className="wc-nav-btns">
                   <button className="wc-nav-btn" onClick={prevMonth} aria-label="Previous month">←</button>
                   <button className="wc-nav-btn" onClick={nextMonth} aria-label="Next month">→</button>
                 </div>
               </div>
+
+              {/* Picker portal — renders outside overflow:hidden containers */}
+              {pickerOpen && createPortal(
+                <div
+                  id="wc-picker-portal"
+                  className="wc-picker-popover"
+                  style={{ top: pickerPos.top, right: pickerPos.right }}
+                >
+                  {pickerOpen === "year"
+                    ? Array.from({ length: 21 }, (_, i) => today.getFullYear() - 5 + i).map((y) => (
+                        <button
+                          key={y}
+                          className={`wc-picker-item${y === year ? " wc-picker-item--active" : ""}`}
+                          onClick={() => { setYear(y); setRangeStart(null); setRangeEnd(null); setSelecting(false); setPickerOpen(null); }}
+                          type="button"
+                        >{y}</button>
+                      ))
+                    : MONTHS.map((name, i) => (
+                        <button
+                          key={i}
+                          className={`wc-picker-item${i === month ? " wc-picker-item--active" : ""}`}
+                          onClick={() => { setMonth(i); setRangeStart(null); setRangeEnd(null); setSelecting(false); setPickerOpen(null); }}
+                          type="button"
+                        >{name}</button>
+                      ))
+                  }
+                </div>,
+                document.body
+              )}
             </div>
 
             {/* z=2 — Cover div with bg-image, V-shape clip + shadow */}
@@ -494,25 +694,46 @@ export default function WallCalendar({
 
             {/* Notes */}
             <aside className="wc-notes">
-              <p className="wc-notes-label">Notes</p>
-              {notesRangeLabel && (
-                <p className="wc-notes-range">{notesRangeLabel}</p>
-              )}
-              <div className="wc-notes-fields">
-                {currentNotes.map((val, i) => (
-                  <input
-                    key={i}
-                    className="wc-note-input"
-                    type="text"
-                    placeholder={`Note ${i + 1}…`}
-                    value={val}
-                    onChange={(e) => updateNote(i, e.target.value)}
-                  />
-                ))}
+              <div className="wc-notes-header">
+                <p className="wc-notes-label">Notes</p>
+                <button
+                  className="wc-notes-toggle"
+                  onClick={() => setShowAllNotes((v) => !v)}
+                  type="button"
+                >
+                  {showAllNotes ? "Edit" : `All (${monthNotesList.length})`}
+                </button>
               </div>
-              <button className="wc-add-note" onClick={addNote} type="button">
-                + add note
-              </button>
+
+              {showAllNotes ? (
+                <NotesList
+                  items={monthNotesList}
+                  onDeleteGroup={deleteNoteGroup}
+                  onDeleteNote={deleteNoteItem}
+                />
+              ) : (
+                /* ── Edit view ── */
+                <>
+                  <p className="wc-notes-range">
+                    {notesRangeLabel || `${SHORT_MONTHS[month]} ${year}`}
+                  </p>
+                  <div className="wc-notes-fields">
+                    {currentNotes.map((val, i) => (
+                      <input
+                        key={i}
+                        className="wc-note-input"
+                        type="text"
+                        placeholder={`Note ${i + 1}…`}
+                        value={val}
+                        onChange={(e) => updateNote(i, e.target.value)}
+                      />
+                    ))}
+                  </div>
+                  <button className="wc-add-note" onClick={addNote} type="button">
+                    + add note
+                  </button>
+                </>
+              )}
 
               {/* Holidays */}
               <div className="wc-holidays">
@@ -578,6 +799,7 @@ export default function WallCalendar({
                       isEnd={isEnd}
                       inRange={inRange}
                       hasHoliday={!!holidays[d]}
+                      noteType={daysWithNoteType.get(d) ?? null}
                       onClick={() => handleDayClick(d)}
                     />
                   );
